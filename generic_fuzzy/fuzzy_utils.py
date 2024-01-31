@@ -43,12 +43,12 @@ class GenericFuzzy:
   def membership_function(self, min, max, i, x):
     if i == 0:
       point_1 = self.partition(min, max, i)
-      point_2 = self.partition(min, max, i + 1)
+      point_2 = self.partition(min, max, i + 2)
       mean = point_1
       std = self.c*(point_2 - point_1)
       return np.where(point_1 <= x, np.exp(-((x - mean)**2)/(2*(std**2))), 1)
     elif i == self.num_intervals:
-      point_1 = self.partition(min, max, i - 1)
+      point_1 = self.partition(min, max, i - 2)
       point_2 = self.partition(min, max, i )
       mean = point_2
       std = self.c*(point_2 - point_1)
@@ -86,9 +86,8 @@ class GenericFuzzy:
        raise ValueError('Target value is required!')
     elif target_value:
        self.target_consequent = target_value
-
-    self.apply_fuzzy_sets_to_variables()
   
+    self.apply_fuzzy_sets_to_variables()
     # Encode categorical data (convert to binary format)
     self.data_encoded = pd.get_dummies(self.Data, columns=self.data.columns)
 
@@ -145,6 +144,7 @@ class GenericFuzzy:
       
       for el in self.data.columns if el != self.target_consequent
     }
+
   def provide_consequent(self):
     self.consequent = ctrl.Consequent(
       np.arange(
@@ -153,37 +153,34 @@ class GenericFuzzy:
       self.target_consequent
     )
   
-  def partition_fuzzy_generic_control(self,
-                variable_name:str,
-                i,
-                num_intervals:int=5):
-
-    min = self.data[variable_name].min()
-    max = self.data[variable_name].max()
-    return  min + i*(max - min)/num_intervals
-  
-  def membership_function_fuzzy_generic_control(self, variable):
+  def membership_function_fuzzy_generic_control(self, variable, min, max):
     for i in range(self.num_fuzzy_sets):
       string = str(i)
       if i == 0:
-        point_1 = self.partition_fuzzy_generic_control(variable.label, i)
-        point_2 = self.partition_fuzzy_generic_control(variable.label, i + 1)
+        point_1 = self.partition(min, max, i)
+        point_2 = self.partition(min, max, i + 2)
         variable[string] = fuzz.gaussmf(variable.universe, point_1, self.c*(point_2 - point_1))
       elif i == self.num_intervals:
-        point_1 = self.partition_fuzzy_generic_control(variable.label, i - 1)
-        point_2 = self.partition_fuzzy_generic_control(variable.label, i )
+        point_1 = self.partition(min, max, i - 2)
+        point_2 = self.partition(min, max, i )
         variable[string] = fuzz.gaussmf(variable.universe, point_2, self.c*(point_2 - point_1))
       else:
-        point_1 = self.partition_fuzzy_generic_control(variable.label, i - 1)
-        point_2 = self.partition_fuzzy_generic_control(variable.label, i)
-        point_3 = self.partition_fuzzy_generic_control(variable.label, i + 1)
-        variable[string] = fuzz.gaussmf(variable.universe, point_2, self.c*(point_3 - point_2))
+        point_1 = self.partition(min, max, i - 1)
+        point_2 = self.partition(min, max, i)
+        point_3 = self.partition(min, max, i + 1)
+        variable[string] = fuzz.gaussmf(variable.universe, point_2, self.c*(point_3 - point_1))
   
   def apply_membership_function(self):
     for el in self.antecedent.values():
-      self.membership_function_fuzzy_generic_control(el)
-    
-    self.membership_function_fuzzy_generic_control(self.consequent)
+      self.membership_function_fuzzy_generic_control(
+        el, self.data[el.label].min(),
+        self.data[el.label].max()
+      )
+
+    self.membership_function_fuzzy_generic_control(
+      self.consequent, self.data[self.consequent.label].min(),
+      self.data[self.consequent.label].max()
+    )
   
   # Define the rules
 
